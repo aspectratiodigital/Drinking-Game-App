@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { Card, RANK_LABEL, SUIT_SYMBOL, isRed } from "@dga/game-engine";
+import { useTheme } from "../theme/ThemeContext";
 
 interface Props {
   card: Card | null; // null = face-down / empty slot
 }
 
 export default function PlayingCard({ card }: Props) {
+  const { colors } = useTheme();
   const flip = useRef(new Animated.Value(card ? 1 : 0)).current;
 
   useEffect(() => {
@@ -22,12 +24,24 @@ export default function PlayingCard({ card }: Props) {
 
   return (
     <View style={styles.wrapper}>
-      <Animated.View style={[styles.card, styles.cardBack, { transform: [{ rotateY: frontRotate }] }]}>
-        <View style={styles.backPattern} />
+      <Animated.View
+        style={[
+          styles.card,
+          { backgroundColor: colors.cardBackground, borderColor: colors.border },
+          { transform: [{ rotateY: frontRotate }] },
+        ]}
+      >
+        <View style={[styles.backPattern, { borderColor: colors.cardBackDecoration }]} />
       </Animated.View>
-      <Animated.View style={[styles.card, styles.cardFront, { transform: [{ rotateY: backRotate }] }]}>
+      <Animated.View
+        style={[
+          styles.card,
+          { backgroundColor: colors.cardBackground, borderColor: colors.border },
+          { transform: [{ rotateY: backRotate }] },
+        ]}
+      >
         {card && (
-          <Text style={[styles.rank, { color: isRed(card) ? "#d81b3f" : "#1a1a1a" }]}>
+          <Text style={[styles.rank, { color: isRed(card) ? colors.suitRed : colors.suitPrimary }]}>
             {RANK_LABEL[card.rank]}
             {"\n"}
             {SUIT_SYMBOL[card.suit]}
@@ -48,27 +62,16 @@ const styles = StyleSheet.create({
     width: 120,
     height: 168,
     borderRadius: 12,
+    borderWidth: 3,
     backfaceVisibility: "hidden",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-  },
-  cardBack: {
-    backgroundColor: "#1e3a8a",
   },
   backPattern: {
     width: 90,
     height: 138,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: "#3b5fc9",
-  },
-  cardFront: {
-    backgroundColor: "#ffffff",
   },
   rank: {
     fontSize: 36,

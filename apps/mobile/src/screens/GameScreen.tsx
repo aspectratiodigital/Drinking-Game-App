@@ -12,6 +12,8 @@ import {
   submitGuess,
 } from "@dga/game-engine";
 import PlayingCard from "../components/PlayingCard";
+import { useTheme } from "../theme/ThemeContext";
+import { ThemeColors } from "../theme/colors";
 
 interface Props {
   playerNames: string[];
@@ -43,18 +45,22 @@ function buildGuess(phase: RoundPhase, value: string): Guess {
 }
 
 export default function GameScreen({ playerNames, onExit }: Props) {
+  const { colors } = useTheme();
   const [state, setState] = useState<GameState>(() => createGame(playerNames));
 
   if (state.stage === "gameOver") {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>🎉 Game Over</Text>
-        <Text style={styles.subtitle}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Game Over</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {state.players.find((p) => p.id === state.busPlayerId)?.name} cleared the bus!
         </Text>
-        <ScoreList state={state} />
-        <Pressable style={styles.primaryBtn} onPress={onExit}>
-          <Text style={styles.primaryBtnText}>New Game</Text>
+        <ScoreList state={state} colors={colors} />
+        <Pressable
+          style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
+          onPress={onExit}
+        >
+          <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>New Game</Text>
         </Pressable>
       </View>
     );
@@ -77,45 +83,61 @@ export default function GameScreen({ playerNames, onExit }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Pressable style={styles.exitBtn} onPress={onExit}>
-        <Text style={styles.exitBtnText}>✕ End Game</Text>
+        <Text style={[styles.exitBtnText, { color: colors.textMuted }]}>✕ End Game</Text>
       </Pressable>
 
-      {onBus && <Text style={styles.busBanner}>🚌 ON THE BUS</Text>}
-      <Text style={styles.playerName}>{currentPlayer.name}'s turn</Text>
-      <Text style={styles.question}>{currentQuestion(state)}</Text>
+      {onBus && <Text style={[styles.busBanner, { color: colors.suitRed }]}>🚌 ON THE BUS</Text>}
+      <Text style={[styles.playerName, { color: colors.text }]}>{currentPlayer.name}'s turn</Text>
+      <Text style={[styles.question, { color: colors.textMuted }]}>{currentQuestion(state)}</Text>
 
       <View style={styles.cardArea}>
         <PlayingCard card={revealedCard} />
       </View>
 
       {state.lastResult && (
-        <Text style={[styles.result, state.lastResult.correct ? styles.correct : styles.wrong]}>
-          {state.lastResult.correct ? "Correct!" : `Wrong — drink!`}
+        <Text style={[styles.result, { color: state.lastResult.correct ? colors.correct : colors.wrong }]}>
+          {state.lastResult.correct ? "Correct!" : "Wrong — drink!"}
         </Text>
       )}
 
       {!state.lastResult ? (
-        <GuessButtons phase={phase} onGuess={handleGuess} />
+        <GuessButtons phase={phase} colors={colors} onGuess={handleGuess} />
       ) : (
-        <Pressable style={styles.primaryBtn} onPress={handleNext}>
-          <Text style={styles.primaryBtnText}>{onBus ? "Next Card" : "Next Player"}</Text>
+        <Pressable
+          style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
+          onPress={handleNext}
+        >
+          <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>
+            {onBus ? "Next Card" : "Next Player"}
+          </Text>
         </Pressable>
       )}
 
-      <ScoreList state={state} />
+      <ScoreList state={state} colors={colors} />
     </View>
   );
 }
 
-function GuessButtons({ phase, onGuess }: { phase: RoundPhase; onGuess: (value: string) => void }) {
+function GuessButtons({
+  phase,
+  colors,
+  onGuess,
+}: {
+  phase: RoundPhase;
+  colors: ThemeColors;
+  onGuess: (value: string) => void;
+}) {
+  const btnStyle = [styles.choiceBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }];
+  const btnTextStyle = [styles.choiceBtnText, { color: colors.text }];
+
   if (phase === "guessSuit") {
     return (
       <View style={styles.suitGrid}>
         {SUITS.map((s) => (
-          <Pressable key={s.value} style={styles.suitBtn} onPress={() => onGuess(s.value)}>
-            <Text style={styles.choiceBtnText}>{s.label}</Text>
+          <Pressable key={s.value} style={[styles.suitBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]} onPress={() => onGuess(s.value)}>
+            <Text style={btnTextStyle}>{s.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -131,21 +153,21 @@ function GuessButtons({ phase, onGuess }: { phase: RoundPhase; onGuess: (value: 
 
   return (
     <View style={styles.choiceRow}>
-      <Pressable style={styles.choiceBtn} onPress={() => onGuess(a)}>
-        <Text style={styles.choiceBtnText}>{capitalize(a)}</Text>
+      <Pressable style={btnStyle} onPress={() => onGuess(a)}>
+        <Text style={btnTextStyle}>{capitalize(a)}</Text>
       </Pressable>
-      <Pressable style={styles.choiceBtn} onPress={() => onGuess(b)}>
-        <Text style={styles.choiceBtnText}>{capitalize(b)}</Text>
+      <Pressable style={btnStyle} onPress={() => onGuess(b)}>
+        <Text style={btnTextStyle}>{capitalize(b)}</Text>
       </Pressable>
     </View>
   );
 }
 
-function ScoreList({ state }: { state: GameState }) {
+function ScoreList({ state, colors }: { state: GameState; colors: ThemeColors }) {
   return (
     <View style={styles.scoreList}>
       {state.players.map((p) => (
-        <Text key={p.id} style={styles.scoreRow}>
+        <Text key={p.id} style={[styles.scoreRow, { color: colors.textMuted }]}>
           {p.name}: {p.drinksOwed} 🍺{p.id === state.busPlayerId ? "  🚌" : ""}
         </Text>
       ))}
@@ -158,21 +180,19 @@ function capitalize(s: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a", alignItems: "center", paddingTop: 64, paddingHorizontal: 24 },
+  container: { flex: 1, alignItems: "center", paddingTop: 64, paddingHorizontal: 24 },
   exitBtn: { position: "absolute", top: 48, right: 16, padding: 8 },
-  exitBtnText: { color: "#94a3b8" },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 8 },
-  subtitle: { fontSize: 16, color: "#94a3b8", marginBottom: 24, textAlign: "center" },
-  busBanner: { color: "#fbbf24", fontWeight: "800", fontSize: 16, marginBottom: 4 },
-  playerName: { color: "#fff", fontSize: 22, fontWeight: "700", marginTop: 8 },
-  question: { color: "#94a3b8", fontSize: 16, marginTop: 4, marginBottom: 24 },
+  exitBtnText: {},
+  title: { fontSize: 28, fontWeight: "800", marginBottom: 8 },
+  subtitle: { fontSize: 16, marginBottom: 24, textAlign: "center" },
+  busBanner: { fontWeight: "800", fontSize: 16, marginBottom: 4 },
+  playerName: { fontSize: 22, fontWeight: "700", marginTop: 8 },
+  question: { fontSize: 16, marginTop: 4, marginBottom: 24 },
   cardArea: { height: 168, justifyContent: "center", alignItems: "center", marginBottom: 20 },
   result: { fontSize: 20, fontWeight: "700", marginBottom: 16 },
-  correct: { color: "#4ade80" },
-  wrong: { color: "#f87171" },
   choiceRow: { flexDirection: "row", gap: 12 },
   choiceBtn: {
-    backgroundColor: "#1e293b",
+    borderWidth: 2,
     paddingVertical: 16,
     paddingHorizontal: 28,
     borderRadius: 12,
@@ -181,16 +201,16 @@ const styles = StyleSheet.create({
   },
   suitGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12 },
   suitBtn: {
-    backgroundColor: "#1e293b",
+    borderWidth: 2,
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderRadius: 12,
     minWidth: 130,
     alignItems: "center",
   },
-  choiceBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  primaryBtn: { backgroundColor: "#22c55e", paddingVertical: 16, paddingHorizontal: 40, borderRadius: 12 },
-  primaryBtnText: { color: "#052e16", fontSize: 18, fontWeight: "700" },
+  choiceBtnText: { fontSize: 16, fontWeight: "600" },
+  primaryBtn: { borderWidth: 2, paddingVertical: 16, paddingHorizontal: 40, borderRadius: 12 },
+  primaryBtnText: { fontSize: 18, fontWeight: "700" },
   scoreList: { marginTop: 32, alignItems: "center" },
-  scoreRow: { color: "#cbd5e1", fontSize: 14, marginBottom: 4 },
+  scoreRow: { fontSize: 14, marginBottom: 4 },
 });
