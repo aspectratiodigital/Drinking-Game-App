@@ -4,11 +4,12 @@ import { useTheme } from "../theme/ThemeContext";
 
 interface Props {
   title: string;
+  hint?: string;
   onStart: (playerNames: string[]) => void;
   onBack: () => void;
 }
 
-export default function SetupScreen({ title, onStart, onBack }: Props) {
+export default function SetupScreen({ title, hint, onStart, onBack }: Props) {
   const { colors } = useTheme();
   const [names, setNames] = useState<string[]>(["Player 1", "Player 2"]);
 
@@ -33,6 +34,7 @@ export default function SetupScreen({ title, onStart, onBack }: Props) {
 
       <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>Who's playing?</Text>
+      {hint && <Text style={[styles.hint, { color: colors.textMuted }]}>{hint}</Text>}
 
       {names.map((name, i) => (
         <View key={i} style={styles.row}>
@@ -79,7 +81,8 @@ const styles = StyleSheet.create({
   backBtn: { position: "absolute", top: 64, left: 16, padding: 8 },
   backBtnText: { fontSize: 16, fontWeight: "600" },
   title: { fontSize: 32, fontWeight: "800", textAlign: "center" },
-  subtitle: { fontSize: 16, textAlign: "center", marginTop: 8, marginBottom: 24 },
+  subtitle: { fontSize: 16, textAlign: "center", marginTop: 8, marginBottom: 8 },
+  hint: { fontSize: 13, textAlign: "center", marginBottom: 20, fontStyle: "italic" },
   row: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   input: {
     flex: 1,

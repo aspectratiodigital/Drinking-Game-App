@@ -44,7 +44,7 @@ function buildGuess(phase: RoundPhase, value: string): Guess {
   }
 }
 
-export default function GameScreen({ playerNames, onExit }: Props) {
+export default function RideTheBusScreen({ playerNames, onExit }: Props) {
   const { colors } = useTheme();
   const [state, setState] = useState<GameState>(() => createGame(playerNames));
 
