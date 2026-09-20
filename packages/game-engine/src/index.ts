@@ -3,3 +3,4 @@ export * from "./rideTheBus";
 export * from "./ringOfFire";
 export * from "./fuckTheDealer";
 export * from "./neverHaveIEver";
+export * from "./lostInThailand";

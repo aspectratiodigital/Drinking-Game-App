@@ -6,6 +6,7 @@ import RideTheBusScreen from "./src/screens/RideTheBusScreen";
 import RingOfFireScreen from "./src/screens/RingOfFireScreen";
 import FuckTheDealerScreen from "./src/screens/FuckTheDealerScreen";
 import NeverHaveIEverScreen from "./src/screens/NeverHaveIEverScreen";
+import LostInThailandScreen from "./src/screens/LostInThailandScreen";
 import ComingSoonScreen from "./src/screens/ComingSoonScreen";
 import { GameDef } from "./src/data/games";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
@@ -30,6 +31,8 @@ function GameByGameId({ gameId, playerNames, onExit }: { gameId: string; playerN
       return <FuckTheDealerScreen playerNames={playerNames} onExit={onExit} />;
     case "never-have-i-ever":
       return <NeverHaveIEverScreen playerNames={playerNames} onExit={onExit} />;
+    case "lost-in-thailand":
+      return <LostInThailandScreen playerNames={playerNames} onExit={onExit} />;
     default:
       return null;
   }
