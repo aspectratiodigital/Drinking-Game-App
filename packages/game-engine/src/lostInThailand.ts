@@ -1,4 +1,4 @@
-import { Card, buildDeck, shuffle } from "./deck";
+import { Card, buildDeck, drawFromDeck, shuffle } from "./deck";
 
 export type RoadId = "top" | "middle" | "bottom";
 export type Side = "left" | "right";
@@ -7,7 +7,7 @@ const BASE_LENGTH: Record<RoadId, number> = { top: 1, middle: 3, bottom: 1 };
 const ROAD_ORDER: RoadId[] = ["top", "middle", "bottom"];
 
 export interface Road {
-  base: Card[]; // fixed, dealt at game start (or after a reset) — never changes shape
+  base: Card[]; // the road's current starting cards — replaced with fresh cards on a reset
   leftExtension: Card[]; // nearest-to-base card first; last entry is the current left end
   rightExtension: Card[]; // nearest-to-base card first; last entry is the current right end
 }
@@ -50,6 +50,7 @@ export interface LostInThailandState {
   players: string[];
   currentPlayerIndex: number;
   deck: Card[];
+  discard: Card[]; // every card that leaves play lands here; reshuffled back in once the deck runs out
   roads: Record<RoadId, Road>;
   streak: number;
   hitLongestRoadInRun: boolean;
@@ -75,6 +76,7 @@ export function createLostInThailandGame(players: string[]): LostInThailandState
     players,
     currentPlayerIndex: 0,
     deck: rest,
+    discard: [],
     roads,
     streak: 0,
     hitLongestRoadInRun: false,
@@ -88,8 +90,24 @@ function longestRoadLength(roads: Record<RoadId, Road>): number {
   return Math.max(...ROAD_ORDER.map((id) => roadLength(roads[id])));
 }
 
+/** All roads currently tied for the most cards — the "longest road" indicator, and where a forced 3rd guess must land. */
+export function longestRoads(state: LostInThailandState): RoadId[] {
+  const maxLen = longestRoadLength(state.roads);
+  return ROAD_ORDER.filter((id) => roadLength(state.roads[id]) === maxLen);
+}
+
 export function isBankable(state: LostInThailandState): boolean {
   return state.streak >= 3 && state.hitLongestRoadInRun;
+}
+
+/** True once the player is on their 3rd guess of the run without having hit the longest road yet — it must land there. */
+export function mustPlayLongestRoad(state: LostInThailandState): boolean {
+  return state.streak === 2 && !state.hitLongestRoadInRun;
+}
+
+/** Roads the current guess is allowed to target, given the forced-longest-road rule. */
+export function eligibleRoads(state: LostInThailandState): RoadId[] {
+  return mustPlayLongestRoad(state) ? longestRoads(state) : ROAD_ORDER;
 }
 
 /** Current player guesses higher/lower against one end of a road. Pure — returns a new state. */
@@ -102,13 +120,16 @@ export function submitLitGuess(
   if (state.awaitingResolution) {
     throw new Error("A card is already revealed; call bankTurn() or continueTurn() first");
   }
+  if (!eligibleRoads(state).includes(roadId)) {
+    throw new Error("Must play on the longest road for this guess");
+  }
 
   const road = state.roads[roadId];
   const endCard: Card = side === "left" ? leftEndCard(road) : rightEndCard(road);
   const isLongestRoadPlay = roadLength(road) === longestRoadLength(state.roads);
 
-  const deck = state.deck.length > 0 ? state.deck : shuffle(buildDeck());
-  const [drawnCard, ...rest] = deck;
+  const draw = drawFromDeck(state.deck, state.discard);
+  const drawnCard = draw.card;
   const correct: boolean =
     drawnCard.rank !== endCard.rank &&
     (guess === "higher" ? drawnCard.rank > endCard.rank : drawnCard.rank < endCard.rank);
@@ -123,7 +144,8 @@ export function submitLitGuess(
 
     return {
       ...state,
-      deck: rest,
+      deck: draw.deck,
+      discard: draw.discard,
       roads: { ...state.roads, [roadId]: updatedRoad },
       streak: state.streak + 1,
       hitLongestRoadInRun: state.hitLongestRoadInRun || isLongestRoadPlay,
@@ -134,17 +156,28 @@ export function submitLitGuess(
   }
 
   const drinkAmount = roadLength(road);
-  const resetRoad: Road = { base: road.base, leftExtension: [], rightExtension: [] };
+  // The whole road — including its original base — is discarded and dealt fresh from the deck.
+  let deck = draw.deck;
+  let discard = [...draw.discard, ...roadCards(road), drawnCard];
+  const newBase: Card[] = [];
+  for (let i = 0; i < BASE_LENGTH[roadId]; i++) {
+    const dealt = drawFromDeck(deck, discard);
+    newBase.push(dealt.card);
+    deck = dealt.deck;
+    discard = dealt.discard;
+  }
+  const resetRoad: Road = { base: newBase, leftExtension: [], rightExtension: [] };
 
   return {
     ...state,
-    deck: rest,
+    deck,
+    discard,
     roads: { ...state.roads, [roadId]: resetRoad },
     streak: 0,
     hitLongestRoadInRun: false,
     lastGuess: { roadId, side, endCard, guess, drawnCard, correct: false, wasLongestRoad: isLongestRoadPlay, drinkAmount },
     awaitingResolution: true,
-    log: [...state.log, `${player} guessed ${guess} on ${roadId}: wrong, drinks ${drinkAmount}, road reset`],
+    log: [...state.log, `${player} guessed ${guess} on ${roadId}: wrong, drinks ${drinkAmount}, road redealt`],
   };
 }
 

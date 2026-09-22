@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTheme } from "../theme/ThemeContext";
+import AnimatedPressable from "../components/AnimatedPressable";
 
 interface Props {
   title: string;
@@ -56,11 +57,11 @@ export default function SetupScreen({ title, hint, onStart, onBack }: Props) {
         </View>
       ))}
 
-      <Pressable onPress={addPlayer} style={styles.addBtn}>
+      <AnimatedPressable onPress={addPlayer} style={styles.addBtn}>
         <Text style={[styles.addBtnText, { color: colors.text }]}>+ Add Player</Text>
-      </Pressable>
+      </AnimatedPressable>
 
-      <Pressable
+      <AnimatedPressable
         disabled={!canStart}
         onPress={() => onStart(names.map((n) => n.trim()))}
         style={[
@@ -70,7 +71,7 @@ export default function SetupScreen({ title, hint, onStart, onBack }: Props) {
         ]}
       >
         <Text style={[styles.startBtnText, { color: colors.buttonText }]}>Start Game</Text>
-      </Pressable>
+      </AnimatedPressable>
     </ScrollView>
   );
 }
@@ -80,29 +81,29 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 96, alignItems: "stretch" },
   backBtn: { position: "absolute", top: 64, left: 16, padding: 8 },
   backBtnText: { fontSize: 16, fontWeight: "600" },
-  title: { fontSize: 32, fontWeight: "800", textAlign: "center" },
-  subtitle: { fontSize: 16, textAlign: "center", marginTop: 8, marginBottom: 8 },
-  hint: { fontSize: 13, textAlign: "center", marginBottom: 20, fontStyle: "italic" },
-  row: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  title: { fontSize: 34, fontWeight: "800", textAlign: "center" },
+  subtitle: { fontSize: 17, textAlign: "center", marginTop: 8, marginBottom: 8 },
+  hint: { fontSize: 14, textAlign: "center", marginBottom: 22, fontStyle: "italic" },
+  row: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   input: {
     flex: 1,
     borderWidth: 2,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-    fontSize: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    borderRadius: 12,
+    fontSize: 17,
   },
   removeBtn: { marginLeft: 8, padding: 10 },
-  removeBtnText: { fontSize: 18, fontWeight: "700" },
-  addBtn: { paddingVertical: 12, alignItems: "center" },
-  addBtnText: { fontSize: 16, fontWeight: "600" },
+  removeBtnText: { fontSize: 19, fontWeight: "700" },
+  addBtn: { paddingVertical: 14, alignItems: "center" },
+  addBtnText: { fontSize: 17, fontWeight: "600" },
   startBtn: {
-    marginTop: 24,
+    marginTop: 26,
     borderWidth: 2,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: "center",
   },
   startBtnDisabled: { opacity: 0.4 },
-  startBtnText: { fontSize: 18, fontWeight: "700" },
+  startBtnText: { fontSize: 19, fontWeight: "700" },
 });

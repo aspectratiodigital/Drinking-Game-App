@@ -3,8 +3,9 @@ import { Card, Rank, buildDeck, shuffle } from "./deck";
 export interface RingOfFireState {
   players: string[];
   currentPlayerIndex: number;
-  deck: Card[];
-  revealedCard: Card | null;
+  circle: Card[]; // all 52 cards, laid out face-down around the cup in a fixed shuffled order
+  revealedIndices: number[]; // circle positions that have been picked up, in the order they were picked
+  activeIndex: number | null; // the position just picked up, awaiting acknowledgement via advanceRingOfFireTurn
   kingsDrawn: number;
   stage: "playing" | "gameOver";
   log: string[];
@@ -17,8 +18,9 @@ export function createRingOfFireGame(players: string[]): RingOfFireState {
   return {
     players,
     currentPlayerIndex: 0,
-    deck: shuffle(buildDeck()),
-    revealedCard: null,
+    circle: shuffle(buildDeck()),
+    revealedIndices: [],
+    activeIndex: null,
     kingsDrawn: 0,
     stage: "playing",
     log: ["Game started"],
@@ -41,34 +43,46 @@ export const RING_RULES: Record<Rank, string> = {
   14: "Waterfall — everyone drinks continuously until the person before them stops",
 };
 
-/** Reveals the next card for the current player. Pure — returns a new state. */
-export function drawRingOfFireCard(state: RingOfFireState): RingOfFireState {
+/** Picks up the card at this position in the circle. Pure — returns a new state. */
+export function pickRingOfFireCard(state: RingOfFireState, index: number): RingOfFireState {
   if (state.stage === "gameOver") {
     throw new Error("Game is already over");
   }
-  const deck = state.deck.length > 0 ? state.deck : shuffle(buildDeck());
-  const [card, ...rest] = deck;
+  if (state.activeIndex !== null) {
+    throw new Error("A card is already picked up; call advanceRingOfFireTurn() first");
+  }
+  if (index < 0 || index >= state.circle.length) {
+    throw new Error("Index out of range");
+  }
+  if (state.revealedIndices.includes(index)) {
+    throw new Error("That card has already been picked up");
+  }
+
+  const card = state.circle[index];
   const kingsDrawn = state.kingsDrawn + (card.rank === 13 ? 1 : 0);
   const player = state.players[state.currentPlayerIndex];
+  const revealedIndices = [...state.revealedIndices, index];
+  const stage = kingsDrawn >= 4 || revealedIndices.length >= state.circle.length ? "gameOver" : "playing";
 
   return {
     ...state,
-    deck: rest,
-    revealedCard: card,
+    activeIndex: index,
+    revealedIndices,
     kingsDrawn,
-    stage: kingsDrawn >= 4 ? "gameOver" : "playing",
-    log: [...state.log, `${player} drew ${card.rank}: ${RING_RULES[card.rank]}`],
+    stage,
+    log: [...state.log, `${player} picked up ${card.rank}: ${RING_RULES[card.rank]}`],
   };
 }
 
 /** Called once a card's rule has been resolved at the table; advances to the next player's turn. */
 export function advanceRingOfFireTurn(state: RingOfFireState): RingOfFireState {
-  if (state.stage === "gameOver") {
-    throw new Error("Game is already over");
+  if (state.activeIndex === null) {
+    throw new Error("No active card to advance from");
   }
-  if (!state.revealedCard) {
-    throw new Error("No revealed card to advance from");
+  const base = { ...state, activeIndex: null };
+  if (state.stage === "gameOver") {
+    return base;
   }
   const nextPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
-  return { ...state, revealedCard: null, currentPlayerIndex: nextPlayerIndex };
+  return { ...base, currentPlayerIndex: nextPlayerIndex };
 }

@@ -39,6 +39,29 @@ export function isRed(card: Card): boolean {
   return card.suit === "hearts" || card.suit === "diamonds";
 }
 
+export interface DrawResult {
+  card: Card;
+  deck: Card[];
+  discard: Card[];
+}
+
+/**
+ * Draws the top card of `deck`. When `deck` is empty, the `discard` pile is
+ * shuffled back in as a fresh deck first — every game plays from one real,
+ * finite deck rather than conjuring cards out of thin air.
+ */
+export function drawFromDeck(deck: Card[], discard: Card[]): DrawResult {
+  if (deck.length > 0) {
+    const [card, ...rest] = deck;
+    return { card, deck: rest, discard };
+  }
+  if (discard.length === 0) {
+    throw new Error("No cards left in the deck or discard pile");
+  }
+  const [card, ...rest] = shuffle(discard);
+  return { card, deck: rest, discard: [] };
+}
+
 export const RANK_LABEL: Record<Rank, string> = {
   2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 8: "8", 9: "9", 10: "10",
   11: "J", 12: "Q", 13: "K", 14: "A",

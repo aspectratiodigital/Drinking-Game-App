@@ -1,25 +1,26 @@
-import { Card, buildDeck, shuffle } from "./deck";
-
-export type HighLowGuess = "higher" | "lower";
-
-export interface FtdTurnResult {
-  playerId: string;
-  card: Card;
-  guess: HighLowGuess;
-  correct: boolean;
-}
+import { Card, Rank, buildDeck, shuffle } from "./deck";
 
 export interface FuckTheDealerState {
   dealer: string;
   players: string[]; // non-dealer players, in turn order
   currentPlayerIndex: number;
   deck: Card[];
-  referenceCard: Card; // the card being guessed against
-  drinksOwed: Record<string, number>;
-  lastResult: FtdTurnResult | null;
-  awaitingAdvance: boolean;
-  stage: "playing" | "gameOver";
+  table: Card[]; // every card ever placed, in play order — the permanent, ever-growing history the guesser reads
+  pendingCard: Card; // the card currently being revealed/placed
+  revealed: boolean; // has pendingCard been flipped face-up yet
   log: string[];
+}
+
+function drawNextCard(deck: Card[], table: Card[]): { card: Card; deck: Card[] } {
+  if (deck.length > 0) {
+    const [card, ...rest] = deck;
+    return { card, deck: rest };
+  }
+  // The deck only runs out after every card has already been played onto the table. Reshuffle
+  // that same 52-card set back into a fresh deck so play can keep going — the table display
+  // (the guessing aid) is never cleared, it just keeps growing across "shoes".
+  const [card, ...rest] = shuffle(table);
+  return { card, deck: rest };
 }
 
 export function createFuckTheDealerGame(dealer: string, players: string[]): FuckTheDealerState {
@@ -27,77 +28,50 @@ export function createFuckTheDealerGame(dealer: string, players: string[]): Fuck
     throw new Error("Fuck the Dealer needs at least 1 player besides the dealer");
   }
   const deck = shuffle(buildDeck());
-  const [referenceCard, ...rest] = deck;
-  const drinksOwed: Record<string, number> = {};
-  for (const p of players) drinksOwed[p] = 0;
+  const [pendingCard, ...rest] = deck;
 
   return {
     dealer,
     players,
     currentPlayerIndex: 0,
     deck: rest,
-    referenceCard,
-    drinksOwed,
-    lastResult: null,
-    awaitingAdvance: false,
-    stage: "playing",
-    log: [`${dealer} deals. Reference card revealed.`],
+    table: [],
+    pendingCard,
+    revealed: false,
+    log: [`${dealer} deals. First card ready.`],
   };
 }
 
-/** Current player guesses higher/lower than the reference card. Pure — returns a new state. */
-export function submitFtdGuess(state: FuckTheDealerState, guess: HighLowGuess): FuckTheDealerState {
-  if (state.awaitingAdvance) {
-    throw new Error("A card is already revealed; call advanceFtdTurn() first");
+/** Flips the pending card face-up so the card-holder (not the guesser) can see it. */
+export function revealPendingCard(state: FuckTheDealerState): FuckTheDealerState {
+  if (state.revealed) {
+    throw new Error("Card is already revealed");
   }
-  if (state.stage === "gameOver") {
-    throw new Error("Game is already over");
+  return { ...state, revealed: true };
+}
+
+/** Places the revealed card onto the table and draws the next (face-down) card for the next player. */
+export function placePendingCard(state: FuckTheDealerState): FuckTheDealerState {
+  if (!state.revealed) {
+    throw new Error("Card must be revealed before it can be placed on the table");
   }
-
-  if (state.deck.length === 0) {
-    throw new Error("Deck is exhausted; game should already be over");
-  }
-  const [card, ...rest] = state.deck;
-  const player = state.players[state.currentPlayerIndex];
-  const correct =
-    card.rank !== state.referenceCard.rank &&
-    (guess === "higher" ? card.rank > state.referenceCard.rank : card.rank < state.referenceCard.rank);
-
-  const drinksOwed = correct
-    ? state.drinksOwed
-    : { ...state.drinksOwed, [player]: state.drinksOwed[player] + 1 };
-
-  const stage = rest.length === 0 ? "gameOver" : "playing";
+  const table = [...state.table, state.pendingCard];
+  const { card: nextCard, deck } = drawNextCard(state.deck, table);
+  const nextPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
 
   return {
     ...state,
-    deck: rest,
-    referenceCard: card,
-    drinksOwed,
-    lastResult: { playerId: player, card, guess, correct },
-    awaitingAdvance: true,
-    stage,
-    log: [...state.log, `${player} guessed ${guess}: ${correct ? "correct" : "wrong, drinks!"}`],
+    table,
+    deck,
+    pendingCard: nextCard,
+    revealed: false,
+    currentPlayerIndex: nextPlayerIndex,
+    log: [...state.log, `${state.pendingCard.rank} placed on the table`],
   };
 }
 
-/** Advances to the next player once a wrong guess has been shown, or once a correct one passes the turn. */
-export function advanceFtdTurn(state: FuckTheDealerState): FuckTheDealerState {
-  if (!state.awaitingAdvance) {
-    throw new Error("No revealed card to advance from");
-  }
-  if (state.stage === "gameOver") {
-    return { ...state, lastResult: null, awaitingAdvance: false };
-  }
-
-  const base = { ...state, lastResult: null, awaitingAdvance: false };
-  const wasCorrect = state.lastResult?.correct ?? false;
-
-  // A wrong guess keeps the same player guessing again on the new reference card.
-  if (!wasCorrect) {
-    return base;
-  }
-
-  const nextPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
-  return { ...base, currentPlayerIndex: nextPlayerIndex };
+/** Groups the table history by rank, ascending, for the pile-by-number display. */
+export function tableByRank(table: Card[]): { rank: Rank; cards: Card[] }[] {
+  const ranks: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  return ranks.map((rank) => ({ rank, cards: table.filter((c) => c.rank === rank) }));
 }

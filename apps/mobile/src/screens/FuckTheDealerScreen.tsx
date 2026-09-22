@@ -1,13 +1,21 @@
-import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useRef, useState } from "react";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import {
+  Card,
   FuckTheDealerState,
-  advanceFtdTurn,
+  RANK_LABEL,
+  SUIT_SYMBOL,
   createFuckTheDealerGame,
-  submitFtdGuess,
+  isRed,
+  placePendingCard,
+  revealPendingCard,
+  tableByRank,
 } from "@dga/game-engine";
 import PlayingCard from "../components/PlayingCard";
+import MiniCard from "../components/MiniCard";
+import AnimatedPressable from "../components/AnimatedPressable";
 import { useTheme } from "../theme/ThemeContext";
+import { ThemeColors } from "../theme/colors";
 
 interface Props {
   playerNames: string[]; // first entry is the dealer
@@ -19,118 +27,145 @@ export default function FuckTheDealerScreen({ playerNames, onExit }: Props) {
   const [dealer] = useState(playerNames[0]);
   const [players] = useState(playerNames.slice(1));
   const [state, setState] = useState<FuckTheDealerState>(() => createFuckTheDealerGame(dealer, players));
+  const [peeking, setPeeking] = useState(false);
+  const [placing, setPlacing] = useState(false);
 
-  if (state.stage === "gameOver") {
-    const sorted = [...players].sort((a, b) => state.drinksOwed[b] - state.drinksOwed[a]);
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Game Over</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>The deck is empty</Text>
-        <View style={styles.scoreList}>
-          {sorted.map((p) => (
-            <Text key={p} style={[styles.scoreRow, { color: colors.textMuted }]}>
-              {p}: {state.drinksOwed[p]} 🍺
-            </Text>
-          ))}
-        </View>
-        <Pressable
-          style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
-          onPress={onExit}
-        >
-          <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>New Game</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const placeAnim = useRef(new Animated.Value(0)).current;
 
   const currentPlayer = players[state.currentPlayerIndex];
 
-  const handleGuess = (guess: "higher" | "lower") => {
-    setState((prev) => submitFtdGuess(prev, guess));
+  const handleTapCard = () => {
+    if (placing) return;
+    if (!state.revealed) {
+      setState((s) => revealPendingCard(s));
+      return;
+    }
+    setPlacing(true);
+    Animated.timing(placeAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start(() => {
+      setState((s) => placePendingCard(s));
+      placeAnim.setValue(0);
+      setPlacing(false);
+    });
   };
+
+  const cardScale = placeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] });
+  const cardTranslateY = placeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 160] });
+  const cardOpacity = placeAnim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Pressable style={styles.exitBtn} onPress={onExit}>
+      <AnimatedPressable style={styles.exitBtn} onPress={onExit}>
         <Text style={[styles.exitBtnText, { color: colors.textMuted }]}>✕ End Game</Text>
-      </Pressable>
+      </AnimatedPressable>
 
       <Text style={[styles.dealerLabel, { color: colors.textMuted }]}>Dealer: {dealer}</Text>
       <Text style={[styles.playerName, { color: colors.text }]}>{currentPlayer}'s turn</Text>
-      <Text style={[styles.question, { color: colors.textMuted }]}>
-        Higher or lower than this card?
+      <Text style={[styles.instruction, { color: colors.textMuted }]}>
+        {peeking
+          ? `Table — ${state.table.length} played`
+          : !state.revealed
+          ? "Tap to reveal (don't show the guesser!)"
+          : "Show the guesser, then tap to place"}
       </Text>
 
-      <View style={styles.cardArea}>
-        <PlayingCard card={state.referenceCard} />
-      </View>
-
-      {state.lastResult && (
-        <Text style={[styles.result, { color: state.lastResult.correct ? colors.correct : colors.wrong }]}>
-          {state.lastResult.correct ? "Correct!" : `Wrong — ${currentPlayer} drinks!`}
-        </Text>
-      )}
-
-      {!state.awaitingAdvance ? (
-        <View style={styles.choiceRow}>
-          <Pressable
-            style={[styles.choiceBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-            onPress={() => handleGuess("higher")}
-          >
-            <Text style={[styles.choiceBtnText, { color: colors.text }]}>Higher</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.choiceBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-            onPress={() => handleGuess("lower")}
-          >
-            <Text style={[styles.choiceBtnText, { color: colors.text }]}>Lower</Text>
-          </Pressable>
+      <View style={[styles.stage, { borderColor: colors.border }]}>
+        <View style={styles.tableLayer}>
+          <TableGrid table={state.table} colors={colors} />
         </View>
-      ) : (
-        <Pressable
-          style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
-          onPress={() => setState((prev) => advanceFtdTurn(prev))}
-        >
-          <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>
-            {state.lastResult?.correct ? "Next Player" : "Guess Again"}
-          </Text>
-        </Pressable>
-      )}
 
-      <View style={styles.scoreList}>
-        {players.map((p) => (
-          <Text key={p} style={[styles.scoreRow, { color: colors.textMuted }]}>
-            {p}: {state.drinksOwed[p]} 🍺
-          </Text>
-        ))}
+        {!peeking && (
+          <View style={[StyleSheet.absoluteFill, styles.blurScrim, { backgroundColor: colors.background }]} />
+        )}
+
+        {!peeking && (
+          <AnimatedPressable
+            testID="ftd-pending-card"
+            style={[
+              styles.cardWrap,
+              { transform: [{ scale: cardScale }, { translateY: cardTranslateY }], opacity: cardOpacity },
+            ]}
+            onPress={handleTapCard}
+            disabled={placing}
+          >
+            <PlayingCard card={state.revealed ? state.pendingCard : null} />
+          </AnimatedPressable>
+        )}
+
       </View>
+
+      <AnimatedPressable
+        style={[styles.eyeBtn, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}
+        onPressIn={() => setPeeking(true)}
+        onPressOut={() => setPeeking(false)}
+      >
+        <Text style={styles.eyeIcon}>👁</Text>
+        <Text style={[styles.eyeLabel, { color: colors.text }]}>Hold to review table</Text>
+      </AnimatedPressable>
+    </View>
+  );
+}
+
+function TableGrid({ table, colors }: { table: Card[]; colors: ThemeColors }) {
+  const piles = tableByRank(table).filter((p) => p.cards.length > 0);
+  if (piles.length === 0) {
+    return <Text style={[styles.emptyTable, { color: colors.textMuted }]}>No cards played yet</Text>;
+  }
+  return (
+    <View style={styles.grid}>
+      {piles.map(({ rank, cards }) => (
+        <View key={rank} style={styles.pile}>
+          <Text style={[styles.pileLabel, { color: colors.textMuted }]}>
+            {RANK_LABEL[rank]} ({cards.length})
+          </Text>
+          <View style={styles.pileStack}>
+            {cards.slice(-3).map((c, i) => (
+              <View key={c.id + i} style={[styles.pileCardOffset, { left: i * 4 }]}>
+                <MiniCard card={c} width={34} height={48} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", paddingTop: 64, paddingHorizontal: 24 },
+  container: { flex: 1, alignItems: "center", paddingTop: 60, paddingHorizontal: 20 },
   exitBtn: { position: "absolute", top: 48, right: 16, padding: 8 },
-  exitBtnText: {},
-  title: { fontSize: 28, fontWeight: "800", marginBottom: 8 },
-  subtitle: { fontSize: 16, marginBottom: 24, textAlign: "center" },
+  exitBtnText: { fontSize: 15 },
   dealerLabel: { fontSize: 14, marginBottom: 4 },
-  playerName: { fontSize: 22, fontWeight: "700", marginTop: 8 },
-  question: { fontSize: 16, marginTop: 4, marginBottom: 24 },
-  cardArea: { height: 168, justifyContent: "center", alignItems: "center", marginBottom: 20 },
-  result: { fontSize: 20, fontWeight: "700", marginBottom: 16 },
-  choiceRow: { flexDirection: "row", gap: 12 },
-  choiceBtn: {
-    borderWidth: 2,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    minWidth: 120,
-    alignItems: "center",
+  playerName: { fontSize: 23, fontWeight: "700", marginTop: 6 },
+  instruction: { fontSize: 14, marginTop: 6, marginBottom: 18, textAlign: "center" },
+  stage: {
+    width: "100%",
+    flex: 1,
+    maxHeight: 460,
+    borderWidth: 3,
+    borderRadius: 20,
+    overflow: "hidden",
+    position: "relative",
   },
-  choiceBtnText: { fontSize: 16, fontWeight: "600" },
-  primaryBtn: { borderWidth: 2, paddingVertical: 16, paddingHorizontal: 40, borderRadius: 12 },
-  primaryBtnText: { fontSize: 18, fontWeight: "700" },
-  scoreList: { marginTop: 32, alignItems: "center" },
-  scoreRow: { fontSize: 14, marginBottom: 4 },
+  tableLayer: { flex: 1, padding: 14 },
+  blurScrim: { opacity: 0.93 },
+  cardWrap: { position: "absolute", top: "50%", left: "50%", marginLeft: -66, marginTop: -92 },
+  emptyTable: { textAlign: "center", marginTop: 40, fontSize: 14 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center" },
+  pile: { width: 70, alignItems: "center", marginBottom: 10 },
+  pileLabel: { fontSize: 11, fontWeight: "700", marginBottom: 4 },
+  pileStack: { width: 44, height: 48 },
+  pileCardOffset: { position: "absolute", top: 0 },
+  eyeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginTop: 18,
+    marginBottom: 20,
+  },
+  eyeIcon: { fontSize: 18 },
+  eyeLabel: { fontSize: 14, fontWeight: "600" },
 });

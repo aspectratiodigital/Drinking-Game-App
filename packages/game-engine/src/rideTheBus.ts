@@ -1,4 +1,4 @@
-import { Card, Suit, buildDeck, isRed, shuffle } from "./deck";
+import { Card, Suit, buildDeck, drawFromDeck, isRed, shuffle } from "./deck";
 
 export type RoundPhase = "redBlack" | "highLow" | "insideOutside" | "guessSuit";
 export type GameStage = RoundPhase | "bus" | "gameOver";
@@ -28,6 +28,7 @@ export interface GameState {
   stage: GameStage;
   currentPlayerIndex: number;
   deck: Card[];
+  discard: Card[]; // every drawn card lands here; reshuffled back into the deck once it runs out
   pile: Card[]; // cards drawn on wrong guesses, drunk during the bus phase
   lastResult: TurnResult | null; // set after a guess, cleared once the turn is advanced
   busPlayerId: string | null;
@@ -53,6 +54,7 @@ export function createGame(playerNames: string[]): GameState {
     stage: "redBlack",
     currentPlayerIndex: 0,
     deck: shuffle(buildDeck()),
+    discard: [],
     pile: [],
     lastResult: null,
     busPlayerId: null,
@@ -63,10 +65,9 @@ export function createGame(playerNames: string[]): GameState {
   };
 }
 
-function drawCard(state: GameState): { card: Card; deck: Card[] } {
-  const deck = state.deck.length > 0 ? state.deck : shuffle(buildDeck());
-  const [card, ...rest] = deck;
-  return { card, deck: rest };
+function drawCard(state: GameState): { card: Card; deck: Card[]; discard: Card[] } {
+  const { card, deck, discard } = drawFromDeck(state.deck, state.discard);
+  return { card, deck, discard: [...discard, card] };
 }
 
 function evaluateGuess(guess: Guess, card: Card, history: Card[]): boolean {
@@ -102,10 +103,10 @@ export function submitGuess(state: GameState, guess: Guess): GameState {
     throw new Error("Game is already over");
   }
 
-  const { card, deck } = drawCard(state);
+  const { card, deck, discard } = drawCard(state);
 
   if (state.stage === "bus") {
-    return submitBusGuess(state, guess, card, deck);
+    return submitBusGuess(state, guess, card, deck, discard);
   }
 
   const player = state.players[state.currentPlayerIndex];
@@ -120,6 +121,7 @@ export function submitGuess(state: GameState, guess: Guess): GameState {
   return {
     ...state,
     deck,
+    discard,
     players,
     pile,
     lastResult: { playerId: player.id, card, guess, correct },
@@ -128,7 +130,7 @@ export function submitGuess(state: GameState, guess: Guess): GameState {
   };
 }
 
-function submitBusGuess(state: GameState, guess: Guess, card: Card, deck: Card[]): GameState {
+function submitBusGuess(state: GameState, guess: Guess, card: Card, deck: Card[], discard: Card[]): GameState {
   const busPlayer = state.players.find((p) => p.id === state.busPlayerId)!;
   const correct = evaluateGuess(guess, card, state.busHistory);
   const busHistory = [...state.busHistory, card];
@@ -137,6 +139,7 @@ function submitBusGuess(state: GameState, guess: Guess, card: Card, deck: Card[]
     return {
       ...state,
       deck,
+      discard,
       busHistory,
       busStreak: 0,
       pile: [...state.pile, card],
@@ -152,6 +155,7 @@ function submitBusGuess(state: GameState, guess: Guess, card: Card, deck: Card[]
   return {
     ...state,
     deck,
+    discard,
     busHistory,
     busStreak: cleared ? 0 : busStreak,
     lastResult: { playerId: busPlayer.id, card, guess, correct: true },

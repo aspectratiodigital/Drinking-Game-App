@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import {
   GameState,
   Guess,
@@ -12,6 +12,8 @@ import {
   submitGuess,
 } from "@dga/game-engine";
 import PlayingCard from "../components/PlayingCard";
+import HigherLowerArrows from "../components/HigherLowerArrows";
+import AnimatedPressable from "../components/AnimatedPressable";
 import { useTheme } from "../theme/ThemeContext";
 import { ThemeColors } from "../theme/colors";
 
@@ -56,12 +58,12 @@ export default function RideTheBusScreen({ playerNames, onExit }: Props) {
           {state.players.find((p) => p.id === state.busPlayerId)?.name} cleared the bus!
         </Text>
         <ScoreList state={state} colors={colors} />
-        <Pressable
+        <AnimatedPressable
           style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
           onPress={onExit}
         >
           <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>New Game</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
     );
   }
@@ -84,9 +86,9 @@ export default function RideTheBusScreen({ playerNames, onExit }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Pressable style={styles.exitBtn} onPress={onExit}>
+      <AnimatedPressable style={styles.exitBtn} onPress={onExit}>
         <Text style={[styles.exitBtnText, { color: colors.textMuted }]}>✕ End Game</Text>
-      </Pressable>
+      </AnimatedPressable>
 
       {onBus && <Text style={[styles.busBanner, { color: colors.suitRed }]}>🚌 ON THE BUS</Text>}
       <Text style={[styles.playerName, { color: colors.text }]}>{currentPlayer.name}'s turn</Text>
@@ -105,14 +107,14 @@ export default function RideTheBusScreen({ playerNames, onExit }: Props) {
       {!state.lastResult ? (
         <GuessButtons phase={phase} colors={colors} onGuess={handleGuess} />
       ) : (
-        <Pressable
+        <AnimatedPressable
           style={[styles.primaryBtn, { backgroundColor: colors.buttonBackground, borderColor: colors.border }]}
           onPress={handleNext}
         >
           <Text style={[styles.primaryBtnText, { color: colors.buttonText }]}>
             {onBus ? "Next Card" : "Next Player"}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       )}
 
       <ScoreList state={state} colors={colors} />
@@ -132,33 +134,40 @@ function GuessButtons({
   const btnStyle = [styles.choiceBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }];
   const btnTextStyle = [styles.choiceBtnText, { color: colors.text }];
 
+  if (phase === "highLow") {
+    return <HigherLowerArrows onHigher={() => onGuess("higher")} onLower={() => onGuess("lower")} />;
+  }
+
   if (phase === "guessSuit") {
     return (
       <View style={styles.suitGrid}>
         {SUITS.map((s) => (
-          <Pressable key={s.value} style={[styles.suitBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]} onPress={() => onGuess(s.value)}>
+          <AnimatedPressable
+            key={s.value}
+            style={[styles.suitBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+            onPress={() => onGuess(s.value)}
+          >
             <Text style={btnTextStyle}>{s.label}</Text>
-          </Pressable>
+          </AnimatedPressable>
         ))}
       </View>
     );
   }
 
-  const options: Record<Exclude<RoundPhase, "guessSuit">, [string, string]> = {
+  const options: Record<"redBlack" | "insideOutside", [string, string]> = {
     redBlack: ["red", "black"],
-    highLow: ["higher", "lower"],
     insideOutside: ["inside", "outside"],
   };
   const [a, b] = options[phase];
 
   return (
     <View style={styles.choiceRow}>
-      <Pressable style={btnStyle} onPress={() => onGuess(a)}>
+      <AnimatedPressable style={btnStyle} onPress={() => onGuess(a)}>
         <Text style={btnTextStyle}>{capitalize(a)}</Text>
-      </Pressable>
-      <Pressable style={btnStyle} onPress={() => onGuess(b)}>
+      </AnimatedPressable>
+      <AnimatedPressable style={btnStyle} onPress={() => onGuess(b)}>
         <Text style={btnTextStyle}>{capitalize(b)}</Text>
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }
@@ -180,37 +189,37 @@ function capitalize(s: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", paddingTop: 64, paddingHorizontal: 24 },
-  exitBtn: { position: "absolute", top: 48, right: 16, padding: 8 },
-  exitBtnText: {},
-  title: { fontSize: 28, fontWeight: "800", marginBottom: 8 },
-  subtitle: { fontSize: 16, marginBottom: 24, textAlign: "center" },
-  busBanner: { fontWeight: "800", fontSize: 16, marginBottom: 4 },
-  playerName: { fontSize: 22, fontWeight: "700", marginTop: 8 },
-  question: { fontSize: 16, marginTop: 4, marginBottom: 24 },
-  cardArea: { height: 168, justifyContent: "center", alignItems: "center", marginBottom: 20 },
-  result: { fontSize: 20, fontWeight: "700", marginBottom: 16 },
-  choiceRow: { flexDirection: "row", gap: 12 },
+  container: { flex: 1, alignItems: "center", paddingTop: 72, paddingHorizontal: 24 },
+  exitBtn: { position: "absolute", top: 52, right: 20, padding: 8 },
+  exitBtnText: { fontSize: 15 },
+  title: { fontSize: 30, fontWeight: "800", marginBottom: 10 },
+  subtitle: { fontSize: 17, marginBottom: 28, textAlign: "center" },
+  busBanner: { fontWeight: "800", fontSize: 17, marginBottom: 6 },
+  playerName: { fontSize: 25, fontWeight: "700", marginTop: 10 },
+  question: { fontSize: 17, marginTop: 6, marginBottom: 30 },
+  cardArea: { height: 190, justifyContent: "center", alignItems: "center", marginBottom: 26 },
+  result: { fontSize: 22, fontWeight: "700", marginBottom: 20 },
+  choiceRow: { flexDirection: "row", gap: 16 },
   choiceBtn: {
     borderWidth: 2,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    minWidth: 120,
-    alignItems: "center",
-  },
-  suitGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12 },
-  suitBtn: {
-    borderWidth: 2,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    borderRadius: 14,
     minWidth: 130,
     alignItems: "center",
   },
-  choiceBtnText: { fontSize: 16, fontWeight: "600" },
-  primaryBtn: { borderWidth: 2, paddingVertical: 16, paddingHorizontal: 40, borderRadius: 12 },
-  primaryBtnText: { fontSize: 18, fontWeight: "700" },
-  scoreList: { marginTop: 32, alignItems: "center" },
-  scoreRow: { fontSize: 14, marginBottom: 4 },
+  suitGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 14 },
+  suitBtn: {
+    borderWidth: 2,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    minWidth: 140,
+    alignItems: "center",
+  },
+  choiceBtnText: { fontSize: 17, fontWeight: "600" },
+  primaryBtn: { borderWidth: 2, paddingVertical: 18, paddingHorizontal: 44, borderRadius: 14 },
+  primaryBtnText: { fontSize: 19, fontWeight: "700" },
+  scoreList: { marginTop: 36, alignItems: "center" },
+  scoreRow: { fontSize: 15, marginBottom: 6 },
 });
